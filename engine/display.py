@@ -1,8 +1,12 @@
 """
 Display abstraction.
 
-On the Pi no environment variables are required — the class probes SDL
-drivers automatically in preference order (kmsdrm → fbcon → offscreen).
+On the Pi no environment variables are required.  The class picks a
+driver automatically:
+
+  /dev/fb1 exists  →  fbcon on /dev/fb1  (ST7789 SPI TFT — preferred)
+  /dev/fb1 absent  →  kmsdrm             (HDMI via DRM/KMS)
+  both fail        →  offscreen          (headless / SSH fallback)
 
 To force a specific driver:
     SDL_VIDEODRIVER=fbcon SDL_FBDEV=/dev/fb1 python main.py
@@ -15,44 +19,42 @@ import sys
 import pygame
 from config import DISPLAY_WIDTH, DISPLAY_HEIGHT, SCALE, WINDOW_WIDTH, WINDOW_HEIGHT, FPS
 
-# Tried in order on Linux when SDL_VIDEODRIVER is not already set.
-# kmsdrm  — default on Raspberry Pi OS Bullseye+ (no X11 needed)
-# fbcon   — older Pi OS / custom kernels; needs /dev/fb0 or /dev/fb1
-# offscreen — silent fallback so the app at least starts for debugging
-_LINUX_DRIVERS = ["kmsdrm", "fbcon", "offscreen"]
-
 
 def _init_linux_display() -> str:
-    """Probe SDL video drivers in order; return the one that worked."""
+    """Choose and initialise the best SDL video driver; return its name."""
     os.environ.setdefault("SDL_NOMOUSE", "1")
 
-    # If the caller already chose a driver, honour it and fail loudly.
+    # Respect an explicit override from the environment.
     if "SDL_VIDEODRIVER" in os.environ:
         pygame.display.init()
         return os.environ["SDL_VIDEODRIVER"]
 
-    for driver in _LINUX_DRIVERS:
+    # If the SPI framebuffer device exists, use it directly via fbcon.
+    # This is the correct path for the ST7789 TFT.
+    if os.path.exists("/dev/fb1"):
+        os.environ["SDL_VIDEODRIVER"] = "fbcon"
+        os.environ["SDL_FBDEV"]       = "/dev/fb1"
+        drivers = ["fbcon", "offscreen"]
+    else:
+        # No SPI display yet — fall back to kmsdrm (HDMI) then offscreen.
+        drivers = ["kmsdrm", "offscreen"]
+
+    for driver in drivers:
         os.environ["SDL_VIDEODRIVER"] = driver
-
-        # fbcon needs to know which framebuffer device to use.
-        if driver == "fbcon":
-            # Prefer /dev/fb1 (SPI display) but fall back to /dev/fb0.
-            for fb in ("/dev/fb1", "/dev/fb0"):
-                if os.path.exists(fb):
-                    os.environ.setdefault("SDL_FBDEV", fb)
-                    break
-
         try:
             pygame.display.init()
-            print(f"display: SDL_VIDEODRIVER={driver}")
+            print(f"display: SDL_VIDEODRIVER={driver}"
+                  + (f" SDL_FBDEV={os.environ['SDL_FBDEV']}"
+                     if driver == "fbcon" else ""))
             return driver
         except pygame.error:
             pygame.display.quit()
 
     raise SystemExit(
         "No usable SDL video driver found.\n"
-        "On Pi: ensure the display overlay is loaded and you are in the 'video' group.\n"
-        "Try:  sudo usermod -aG video $USER  then log out and back in."
+        "After wiring the ST7789, reboot and check that /dev/fb1 exists.\n"
+        "On Pi: ensure you are in the 'video' group:\n"
+        "  sudo usermod -aG video $USER  (then log out and back in)"
     )
 
 
