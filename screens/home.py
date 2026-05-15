@@ -1,3 +1,4 @@
+import math
 import pygame
 from screens.base import Screen
 from engine.input import InputState, Button
@@ -30,13 +31,31 @@ class HomeScreen(Screen):
         surface.blit(title, title.get_rect(centerx=DISPLAY_WIDTH // 2, top=18))
         surface.blit(sub,   sub.get_rect(centerx=DISPLAY_WIDTH // 2, top=62))
 
-        # Pokeball decoration
-        cx, cy, r = DISPLAY_WIDTH // 2, 150, 40
-        pygame.draw.circle(surface, (220, 220, 220), (cx, cy), r)
-        pygame.draw.circle(surface, RED,             (cx, cy - r // 2), r // 2)
-        pygame.draw.line(surface, BLACK, (cx - r, cy), (cx + r, cy), 3)
-        pygame.draw.circle(surface, BLACK, (cx, cy), 10, 3)
-        pygame.draw.circle(surface, WHITE, (cx, cy), 7)
+        # Pokéball
+        cx, cy, r = DISPLAY_WIDTH // 2, 150, 44
+
+        # black border
+        pygame.draw.circle(surface, BLACK, (cx, cy), r)
+
+        # white bottom half
+        pygame.draw.circle(surface, (220, 220, 220), (cx, cy), r - 2)
+
+        # red top half — polygon tracing the upper semicircle then closing at centre
+        top_half = [
+            (cx + (r - 2) * math.cos(math.radians(a)),
+             cy + (r - 2) * math.sin(math.radians(a)))
+            for a in range(181, 360)
+        ]
+        top_half.append((cx, cy))
+        pygame.draw.polygon(surface, RED, top_half)
+
+        # horizontal dividing line
+        pygame.draw.line(surface, BLACK, (cx - r + 2, cy), (cx + r - 2, cy), 3)
+
+        # centre button: black ring → dark grey band → white dot
+        pygame.draw.circle(surface, BLACK, (cx, cy), 10)
+        pygame.draw.circle(surface, (60, 60, 60), (cx, cy), 8)
+        pygame.draw.circle(surface, WHITE, (cx, cy), 5)
 
         # blinking prompt
         if (self._tick // 15) % 2 == 0:
