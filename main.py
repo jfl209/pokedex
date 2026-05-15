@@ -23,6 +23,7 @@ def load_fonts() -> dict:
     # Uses pygame's built-in font; swap for a pixel TTF (e.g. "Press Start 2P")
     # by placing it in assets/ and passing the path to pygame.font.Font().
     return {
+        "title": pygame.font.SysFont("monospace", 22, bold=True),
         "large": pygame.font.SysFont("monospace", 18, bold=True),
         "small": pygame.font.SysFont("monospace", 11),
         "tiny":  pygame.font.SysFont("monospace",  9),
