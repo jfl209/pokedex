@@ -12,10 +12,20 @@ A software revival of the 1999 Tiger Electronics Pokémon Pokédex, running on a
 | Component | Part |
 |-----------|------|
 | Shell | Tiger Electronics Pokédex (1999) |
-| SBC | Raspberry Pi Zero 2 W |
+| SBC | Raspberry Pi Zero 1.1 W / Zero 2 W |
 | Display | Adafruit 1.3" 240×240 TFT (ST7789, SPI) |
 | Keyboard | Original PCB re-routed through custom PCB; scanned by ATtiny1614 over USB HID |
 | Audio | Original speaker wired to Pi audio output |
+
+### Custom PCB
+
+The [`hardware/`](hardware/) directory contains the KiCad schematic and PCB layout for the interface board that sits between the Pi and the original Pokédex keyboard membrane.
+
+| File | Description |
+|------|-------------|
+| `pi-zero-mainboard.kicad_sch` | Schematic |
+| `pi-zero-mainboard.kicad_pcb` | PCB layout |
+| `pi-zero-mainboard.kicad_pro` | KiCad project file |
 
 ## Software architecture
 
@@ -67,23 +77,29 @@ python -m data.fetch
 python main.py
 ```
 
-### Run (Raspberry Pi — ST7789 framebuffer)
+### Run (Raspberry Pi)
 
-Add to `/boot/config.txt` (adjust pins to your wiring):
+Install Pi-specific dependencies once:
+
+```bash
+sudo apt install python3-numpy python3-evdev -y
+pip install spidev RPi.GPIO
+```
+
+Enable SPI in `/boot/firmware/config.txt` (Bookworm) or `/boot/config.txt` (Bullseye):
 
 ```ini
-dtoverlay=st7789v,speed=64000000,rotate=0,width=240,height=240
+dtparam=spi=on
 ```
 
 Then launch:
 
 ```bash
-POKEDEX_SCALE=1 \
-SDL_FBDEV=/dev/fb0 \
-SDL_VIDEODRIVER=fbcon \
-SDL_NOMOUSE=1 \
-python main.py
+python3 main.py
 ```
+
+The display driver auto-detects: ST7789 direct SPI → kmsdrm (HDMI) → offscreen.
+FPS is auto-tuned: 20fps on Pi Zero 1.1 W (armv6l), 30fps everywhere else.
 
 ## Controls
 

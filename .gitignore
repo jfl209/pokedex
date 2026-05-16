@@ -4,3 +4,7 @@ __pycache__/
 data/pokedex.db
 assets/sprites/
 assets/cries/
+
+# KiCad lock files and auto-generated backups
+hardware/~*
+hardware/.history/
