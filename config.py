@@ -13,7 +13,9 @@ if SCALE == 1 and sys.platform != "linux":
 WINDOW_WIDTH  = DISPLAY_WIDTH  * SCALE
 WINDOW_HEIGHT = DISPLAY_HEIGHT * SCALE
 
-FPS = 30
+# Pi Zero 1.1 W (armv6l, single-core) can't sustain 30fps through the
+# numpy RGB565 conversion + SPI transfer; 20fps keeps it smooth.
+FPS = 20 if os.uname().machine == "armv6l" else 30
 
 # ── Palette ────────────────────────────────────────────────────────────────
 BLACK      = (  0,   0,   0)
