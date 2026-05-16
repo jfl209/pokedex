@@ -55,10 +55,11 @@ class Display:
             self._tft = _try_st7789()
 
         if self._tft:
-            # Offscreen pygame surface — pixels are pushed to the TFT each flip
-            os.environ["SDL_VIDEODRIVER"] = "offscreen"
-            pygame.display.init()
-            self._window  = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
+            # No pygame display window needed — we write pixels directly to the
+            # TFT over SPI. pygame.init() was already called in main.py so
+            # Surface creation and font/event subsystems work fine without a
+            # display window. Avoid set_mode() entirely: it would try to create
+            # a kmsdrm window (already active from pygame.init) and hang.
             self._surface = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT))
         else:
             if sys.platform == "linux":

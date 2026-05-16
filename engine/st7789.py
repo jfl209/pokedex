@@ -123,9 +123,15 @@ class ST7789:
         g = (arr[:, :, 1] >> 2) & 0x3F
         b = (arr[:, :, 2] >> 3) & 0x1F
         rgb565 = ((r << 11) | (g << 5) | b).byteswap()
+        data   = rgb565.tobytes()
 
         self._cmd(_RAMWR)
-        self._data(rgb565.tobytes())
+        # Send in 4096-byte chunks — the Linux spidev kernel buffer is 4096 bytes
+        # by default. The ST7789 continues its internal address auto-increment
+        # across CS toggles after RAMWR, so chunked writes are safe.
+        GPIO.output(self._dc, GPIO.HIGH)
+        for i in range(0, len(data), 4096):
+            self._spi.writebytes2(data[i : i + 4096])
 
     def cleanup(self) -> None:
         self._spi.close()
