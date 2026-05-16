@@ -55,6 +55,7 @@ class ST7789:
         self._x0   = x_offset
         self._y0   = y_offset
 
+        GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self._dc,  GPIO.OUT)
         GPIO.setup(self._rst, GPIO.OUT)
