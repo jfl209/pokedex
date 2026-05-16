@@ -2,6 +2,11 @@
 
 A software revival of the 1999 Tiger Electronics Pokémon Pokédex, running on a Raspberry Pi Zero 2 W with a 240×240 Adafruit TFT (ST7789) replacing the original LCD.
 
+| | | |
+|---|---|---|
+| ![Front](docs/original-front.png) | ![Keyboard](docs/original-keyboard.png) | ![PCB](docs/original-pcb.png) |
+| Original device (front) | Inside — keyboard + LiPo | Original PCB removed |
+
 ## Hardware
 
 | Component | Part |
