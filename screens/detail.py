@@ -28,7 +28,7 @@ class DetailScreen(Screen):
         path = self._poke.sprite_path
         if not path or not os.path.exists(path):
             return None
-        img = pygame.image.load(path).convert_alpha()
+        img = pygame.image.load(path)
         img = pygame.transform.smoothscale(img, (_SPRITE_SIZE, _SPRITE_SIZE))
         return img
 

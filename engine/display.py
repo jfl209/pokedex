@@ -56,11 +56,10 @@ class Display:
 
         if self._tft:
             # No pygame display window needed — we write pixels directly to the
-            # TFT over SPI. pygame.init() was already called in main.py so
-            # Surface creation and font/event subsystems work fine without a
-            # display window. Avoid set_mode() entirely: it would try to create
-            # a kmsdrm window (already active from pygame.init) and hang.
-            self._surface = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT))
+            # TFT over SPI. Use SRCALPHA so PNG sprites with transparency
+            # composite correctly when blitted onto the surface.
+            self._surface = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT),
+                                           pygame.SRCALPHA)
         else:
             if sys.platform == "linux":
                 driver = _init_sdl_linux()
