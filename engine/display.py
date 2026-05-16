@@ -1,17 +1,14 @@
 """
 Display abstraction.
 
-On the Pi no environment variables are required.  The class picks a
-driver automatically:
+On the Pi, drives the ST7789 directly over SPI — no dtoverlay or
+framebuffer driver required. pygame renders to an offscreen surface;
+each flip() converts pixels to RGB565 and pushes them via spidev.
 
-  /dev/fb1 exists  →  fbcon on /dev/fb1  (ST7789 SPI TFT — preferred)
-  /dev/fb1 absent  →  kmsdrm             (HDMI via DRM/KMS)
-  both fail        →  offscreen          (headless / SSH fallback)
+On Mac/dev, SCALE > 1 opens a scaled-up window for comfortable editing.
 
-To force a specific driver:
-    SDL_VIDEODRIVER=fbcon SDL_FBDEV=/dev/fb1 python main.py
-
-On Mac/dev the config SCALE > 1 so you get a scaled-up window instead.
+To force kmsdrm (HDMI output for debugging):
+    SDL_VIDEODRIVER=kmsdrm python main.py
 """
 
 import os
@@ -20,62 +17,64 @@ import pygame
 from config import DISPLAY_WIDTH, DISPLAY_HEIGHT, SCALE, WINDOW_WIDTH, WINDOW_HEIGHT, FPS
 
 
-def _init_linux_display() -> str:
-    """Choose and initialise the best SDL video driver; return its name."""
-    os.environ.setdefault("SDL_NOMOUSE", "1")
+def _try_st7789():
+    """Return an initialised ST7789 instance, or None if not on Pi / no spidev."""
+    try:
+        import spidev as _spidev   # noqa: F401 — just checking availability
+        import RPi.GPIO as _gpio   # noqa: F401
+        import numpy as _np        # noqa: F401
+        from engine.st7789 import ST7789
+        return ST7789()
+    except Exception as e:
+        print(f"display: ST7789 not available ({e})")
+        return None
 
-    # Respect an explicit override from the environment.
+
+def _init_sdl_linux() -> str:
+    """Probe SDL drivers on Linux; return the one that worked."""
+    os.environ.setdefault("SDL_NOMOUSE", "1")
     if "SDL_VIDEODRIVER" in os.environ:
         pygame.display.init()
         return os.environ["SDL_VIDEODRIVER"]
-
-    # If the SPI framebuffer device exists, use it directly via fbcon.
-    # This is the correct path for the ST7789 TFT.
-    if os.path.exists("/dev/fb1"):
-        os.environ["SDL_VIDEODRIVER"] = "fbcon"
-        os.environ["SDL_FBDEV"]       = "/dev/fb1"
-        drivers = ["fbcon", "offscreen"]
-    else:
-        # No SPI display yet — fall back to kmsdrm (HDMI) then offscreen.
-        drivers = ["kmsdrm", "offscreen"]
-
-    for driver in drivers:
+    for driver in ("kmsdrm", "offscreen"):
         os.environ["SDL_VIDEODRIVER"] = driver
         try:
             pygame.display.init()
-            print(f"display: SDL_VIDEODRIVER={driver}"
-                  + (f" SDL_FBDEV={os.environ['SDL_FBDEV']}"
-                     if driver == "fbcon" else ""))
+            print(f"display: SDL_VIDEODRIVER={driver}")
             return driver
         except pygame.error:
             pygame.display.quit()
-
-    raise SystemExit(
-        "No usable SDL video driver found.\n"
-        "After wiring the ST7789, reboot and check that /dev/fb1 exists.\n"
-        "On Pi: ensure you are in the 'video' group:\n"
-        "  sudo usermod -aG video $USER  (then log out and back in)"
-    )
+    raise SystemExit("No usable SDL video driver found.")
 
 
 class Display:
     def __init__(self) -> None:
+        self._tft = None
+
         if sys.platform == "linux":
-            driver = _init_linux_display()
-            self._fullscreen = (SCALE == 1 and driver != "offscreen")
-        else:
+            self._tft = _try_st7789()
+
+        if self._tft:
+            # Offscreen pygame surface — pixels are pushed to the TFT each flip
+            os.environ["SDL_VIDEODRIVER"] = "offscreen"
             pygame.display.init()
-            self._fullscreen = False
-
-        flags = (pygame.FULLSCREEN | pygame.NOFRAME) if self._fullscreen else 0
-        self._window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), flags)
-        pygame.display.set_caption("Pokédex")
-
-        # Native-res surface — all drawing happens here, then scaled up.
-        if SCALE > 1:
+            self._window  = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
             self._surface = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT))
         else:
-            self._surface = self._window
+            if sys.platform == "linux":
+                driver = _init_sdl_linux()
+                fullscreen = (SCALE == 1 and driver != "offscreen")
+            else:
+                pygame.display.init()
+                fullscreen = False
+
+            flags = (pygame.FULLSCREEN | pygame.NOFRAME) if fullscreen else 0
+            self._window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), flags)
+            pygame.display.set_caption("Pokédex")
+            self._surface = (
+                pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT)) if SCALE > 1
+                else self._window
+            )
 
         self._clock = pygame.time.Clock()
 
@@ -84,8 +83,12 @@ class Display:
         return self._surface
 
     def flip(self) -> None:
-        if SCALE > 1:
+        if self._tft:
+            self._tft.blit_surface(self._surface)
+        elif SCALE > 1:
             scaled = pygame.transform.scale(self._surface, (WINDOW_WIDTH, WINDOW_HEIGHT))
             self._window.blit(scaled, (0, 0))
-        pygame.display.flip()
+            pygame.display.flip()
+        else:
+            pygame.display.flip()
         self._clock.tick(FPS)
